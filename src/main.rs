@@ -116,7 +116,7 @@ impl Component for Model {
 
     fn create(_ctx: &Context<Self>) -> Self {
         Self {
-            grid: Grid::new(5, 5),
+            grid: Grid::new(10, 10),
             current_player: Player::Red,
             last_edited: None,
         }
