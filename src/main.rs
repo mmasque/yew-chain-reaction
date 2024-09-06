@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use grid::Grid;
 use yew::prelude::*;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -35,23 +37,6 @@ struct Cell {
 }
 
 impl Cell {
-    fn new() -> Self {
-        Self {
-            dot_count: 0,
-            owner: None,
-        }
-    }
-
-    fn add_dot(&mut self, player: Player) -> bool {
-        if self.owner.is_none() || self.owner == Some(player) {
-            self.dot_count += 1;
-            self.owner = Some(player);
-            true
-        } else {
-            false
-        }
-    }
-
     fn reset(&mut self) {
         self.dot_count = 0;
         self.owner = None;
@@ -87,38 +72,31 @@ impl Game for Grid<Cell> {
 }
 
 impl Model {
-    // If a player is passed, only increment the count if the player is there
-    fn increment_count(
-        &mut self,
-        row: usize,
-        col: usize,
-        player: Player,
-        transfer_ownership: bool,
-    ) -> bool {
-        let adjacent_indices = self.grid.get_adjacent_indices(row, col);
-        let Some(cell) = self.grid.get_mut(row, col) else {
-            return false;
-        };
-
-        if cell.owner.is_none() || cell.owner == Some(player) || transfer_ownership {
-            cell.owner = Some(player);
-            cell.dot_count += 1;
-            if adjacent_indices.len() == cell.dot_count as usize {
-                // 1. The new value of the cell is 0, no one owns it
-                cell.owner = None;
-                cell.dot_count = 0;
-                // 2. The adjacent cells all get incremented values,
-                // calculating potential adjacent indices for them as well recursively
-                // and they become owned by the player that started the chain (TODO)
-                // TODO: I don't love the depth first approach here, more natural is breadth-first compute
-                for (r, c) in adjacent_indices {
-                    println!("Adjacent: {},{}", r, c);
-                    self.increment_count(r, c, player, true);
-                }
-            }
+    fn increment_count(&mut self, row: usize, col: usize, player: Player) -> bool {
+        let cell = self.grid.get(row, col).unwrap();
+        if cell.owner.is_none() || cell.owner == Some(player) {
+            self.increment_count_inner(row, col, player);
             return true;
         }
         return false;
+    }
+
+    fn increment_count_inner(&mut self, row: usize, col: usize, player: Player) {
+        let mut queue = VecDeque::new();
+        queue.push_back((row, col));
+        while let Some((r, c)) = queue.pop_front() {
+            let adjacent_indices = self.grid.get_adjacent_indices(r, c);
+            let cell = self.grid.get_mut(r, c).unwrap(); // For now
+            cell.dot_count += 1;
+            cell.owner = Some(player);
+            // Full! Start a chain reaction
+            if cell.dot_count as usize == adjacent_indices.len() {
+                cell.reset();
+                for (ar, ac) in adjacent_indices {
+                    queue.push_back((ar, ac));
+                }
+            }
+        }
     }
 }
 
@@ -147,7 +125,7 @@ impl Component for Model {
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::AddDot(row, col) => {
-                if self.increment_count(row, col, self.current_player, false) {
+                if self.increment_count(row, col, self.current_player) {
                     self.last_edited = Some((row, col));
                     self.current_player = self.current_player.next_player();
                 }
