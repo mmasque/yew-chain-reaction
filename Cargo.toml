@@ -1,0 +1,9 @@
+[package]
+name = "chain-reaction"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yew = {version = "0.21.0", features = ["csr"]}
+wasm-bindgen = "0.2"
+grid = "0.14.0"
